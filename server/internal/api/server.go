@@ -19,7 +19,7 @@ func New(cfg *config.Config, st *storage.Store) http.Handler {
 	r := chi.NewRouter()
 	r.Post("/api/upload", s.requireToken(s.handleUpload))
 	r.Get("/api/images", s.requireToken(s.handleList))
-	r.Delete("/api/images/{id}", s.requireToken(s.handleDelete))
+	r.Delete("/api/images/*", s.requireToken(s.handleDelete))
 	r.Get("/admin", s.requireToken(s.handleAdmin))
 	r.Handle("/*", http.StripPrefix("/", http.FileServer(http.Dir(cfg.StorageDir))))
 	return r

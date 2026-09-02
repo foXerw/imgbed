@@ -138,3 +138,82 @@ func TestUploadUnsupportedType(t *testing.T) {
 		t.Fatalf("status = %d, want 415", resp.StatusCode)
 	}
 }
+
+func TestListAndDelete(t *testing.T) {
+	ts, cfg, _ := newTestServer(t)
+	defer ts.Close()
+
+	// 上传一张真实 PNG
+	png := validPNG(t)
+	resp := multipartUpload(t, ts.URL+"/api/upload", cfg.Token, "a.png", png)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("upload status = %d", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	// 列表
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/api/images", nil)
+	req.Header.Set("X-Auth-Token", cfg.Token)
+	listResp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if listResp.StatusCode != http.StatusOK {
+		t.Fatalf("list status = %d", listResp.StatusCode)
+	}
+	defer listResp.Body.Close()
+	var list struct {
+		Images []struct {
+			ID  string `json:"id"`
+			URL string `json:"url"`
+		} `json:"images"`
+		Total int `json:"total"`
+	}
+	if err := json.NewDecoder(listResp.Body).Decode(&list); err != nil {
+		t.Fatal(err)
+	}
+	if list.Total != 1 || len(list.Images) != 1 {
+		t.Fatalf("total=%d len=%d, want 1/1", list.Total, len(list.Images))
+	}
+	id := list.Images[0].ID
+
+	// 删除
+	delReq, _ := http.NewRequest(http.MethodDelete, ts.URL+"/api/images/"+id, nil)
+	delReq.Header.Set("X-Auth-Token", cfg.Token)
+	delResp, err := http.DefaultClient.Do(delReq)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer delResp.Body.Close()
+	if delResp.StatusCode != http.StatusOK {
+		t.Fatalf("delete status = %d", delResp.StatusCode)
+	}
+}
+
+func TestListRequiresToken(t *testing.T) {
+	ts, _, _ := newTestServer(t)
+	defer ts.Close()
+	resp, err := http.Get(ts.URL + "/api/images")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", resp.StatusCode)
+	}
+}
+
+func TestDeleteRejectsTraversal(t *testing.T) {
+	ts, cfg, _ := newTestServer(t)
+	defer ts.Close()
+	req, _ := http.NewRequest(http.MethodDelete, ts.URL+"/api/images/../../etc/passwd", nil)
+	req.Header.Set("X-Auth-Token", cfg.Token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
