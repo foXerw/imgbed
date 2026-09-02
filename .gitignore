@@ -1,0 +1,7 @@
+# 内部 SDD 工作记录（进度台账、评审、任务派发），不进入版本库
+.superpowers/
+
+# IDE
+.idea/
+.vscode/
+*.iml
