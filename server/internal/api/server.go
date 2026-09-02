@@ -1,6 +1,7 @@
 package api
 
 import (
+	_ "embed"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -8,6 +9,9 @@ import (
 	"imgserver/internal/config"
 	"imgserver/internal/storage"
 )
+
+//go:embed web/admin/index.html
+var adminHTML []byte
 
 type server struct {
 	cfg *config.Config

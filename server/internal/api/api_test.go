@@ -6,6 +6,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
@@ -216,4 +217,87 @@ func TestDeleteRejectsTraversal(t *testing.T) {
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
 	}
+}
+
+func TestStaticServing(t *testing.T) {
+	ts, cfg, _ := newTestServer(t)
+	defer ts.Close()
+
+	png := validPNG(t)
+	resp := multipartUpload(t, ts.URL+"/api/upload", cfg.Token, "a.png", png)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("upload status = %d", resp.StatusCode)
+	}
+	var up struct {
+		URL string `json:"url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&up); err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+
+	// 通过相对路径直接 GET 图片（公开、无 token）
+	getResp, err := http.Get(ts.URL + "/" + relFromURL(up.URL))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if getResp.StatusCode != http.StatusOK {
+		t.Fatalf("static status = %d, want 200", getResp.StatusCode)
+	}
+}
+
+func TestAdminRequiresToken(t *testing.T) {
+	ts, _, _ := newTestServer(t)
+	defer ts.Close()
+	if resp, err := http.Get(ts.URL + "/admin"); err == nil {
+		if resp.StatusCode != http.StatusUnauthorized {
+			t.Fatalf("status = %d, want 401", resp.StatusCode)
+		}
+	} else {
+		t.Fatal(err)
+	}
+}
+
+func TestAdminServesEmbeddedPage(t *testing.T) {
+	ts, cfg, _ := newTestServer(t)
+	defer ts.Close()
+
+	req, _ := http.NewRequest(http.MethodGet, ts.URL+"/admin", nil)
+	req.Header.Set("X-Auth-Token", cfg.Token)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/html") {
+		t.Fatalf("content-type = %q, want text/html", ct)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), "图床管理") {
+		t.Fatalf("body missing admin title")
+	}
+}
+
+func relFromURL(u string) string {
+	for i := 0; i < 3; i++ {
+		if idx := indexByte(u, '/'); idx >= 0 {
+			u = u[idx+1:]
+		}
+	}
+	return u
+}
+
+func indexByte(s string, b byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == b {
+			return i
+		}
+	}
+	return -1
 }
