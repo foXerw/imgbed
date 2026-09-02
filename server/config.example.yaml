@@ -1,0 +1,8 @@
+listen: ":8080"
+storageDir: "./storage"
+baseURL: "https://img.example.com"
+token: "change-me"
+maxDimension: 2560
+maxSizeMB: 5
+convertWebp: false
+allowedTypes: ["jpeg", "png", "gif", "webp", "svg"]
