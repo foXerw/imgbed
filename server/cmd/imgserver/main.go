@@ -27,6 +27,13 @@ func main() {
 		log.Printf("config %s not found, using defaults", *cfgPath)
 	}
 
+	if err := cfg.Validate(); err != nil {
+		log.Fatalf("invalid config: %v", err)
+	}
+	if cfg.Token == "change-me" {
+		log.Printf("WARNING: token is the placeholder 'change-me' — set a real token to protect upload/delete")
+	}
+
 	if err := os.MkdirAll(cfg.StorageDir, 0o755); err != nil {
 		log.Fatalf("mkdir storage: %v", err)
 	}

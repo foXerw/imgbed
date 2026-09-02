@@ -10,6 +10,8 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -130,6 +132,21 @@ func TestUploadTooLarge(t *testing.T) {
 	}
 }
 
+func TestUploadAtLimitNotTooLarge(t *testing.T) {
+	ts, cfg, _ := newTestServer(t)
+	defer ts.Close()
+	cfg.MaxSizeMB = 1
+	// 恰好等于上限的正文不应被判定为超限（此处非图片，通过大小检查后应返回 415 而非 413）。
+	resp := multipartUpload(t, ts.URL+"/api/upload", "test-token", "exact.bin", bytes.Repeat([]byte("a"), 1<<20))
+	defer resp.Body.Close()
+	if resp.StatusCode == http.StatusRequestEntityTooLarge {
+		t.Fatal("exactly-at-limit file was rejected as too large (off-by-one)")
+	}
+	if resp.StatusCode != http.StatusUnsupportedMediaType {
+		t.Fatalf("status = %d, want 415", resp.StatusCode)
+	}
+}
+
 func TestUploadUnsupportedType(t *testing.T) {
 	ts, _, _ := newTestServer(t)
 	defer ts.Close()
@@ -216,6 +233,23 @@ func TestDeleteRejectsTraversal(t *testing.T) {
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusBadRequest {
 		t.Fatalf("status = %d, want 400", resp.StatusCode)
+	}
+}
+
+func TestStaticDirListingDisabled(t *testing.T) {
+	ts, cfg, _ := newTestServer(t)
+	defer ts.Close()
+	// 在存储根下建一个目录，请求该目录应返回 404 而非目录列表。
+	if err := os.MkdirAll(filepath.Join(cfg.StorageDir, "2026"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	resp, err := http.Get(ts.URL + "/2026")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404 (directory listing disabled)", resp.StatusCode)
 	}
 }
 

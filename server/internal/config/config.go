@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -42,4 +43,13 @@ func Load(path string) (*Config, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 	return cfg, nil
+}
+
+// Validate 校验配置，返回错误表示无法安全启动。空 token 会使写接口鉴权失效，
+// 必须拒绝启动。
+func (c *Config) Validate() error {
+	if c.Token == "" {
+		return errors.New("token must not be empty (upload/delete would be unauthenticated)")
+	}
+	return nil
 }

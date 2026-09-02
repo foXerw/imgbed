@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -28,8 +29,16 @@ type uploadResponse struct {
 }
 
 func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseMultipartForm(32 << 20); err != nil {
-		writeErr(w, http.StatusBadRequest, "invalid multipart form")
+	// 先用 MaxBytesReader 限制整个请求体，防止未限流的多部分上传写满临时磁盘。
+	const overhead = 1 << 20 // 多部分边界与头部的余量
+	r.Body = http.MaxBytesReader(w, r.Body, s.cfg.MaxSizeMB<<20+overhead)
+	if err := r.ParseMultipartForm(overhead); err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			writeErr(w, http.StatusRequestEntityTooLarge, "file too large")
+		} else {
+			writeErr(w, http.StatusBadRequest, "invalid multipart form")
+		}
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -39,12 +48,13 @@ func (s *server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	data, err := io.ReadAll(io.LimitReader(file, s.cfg.MaxSizeMB<<20))
+	// 多读 1 字节以区分「恰好等于上限」与「超过上限」。
+	data, err := io.ReadAll(io.LimitReader(file, s.cfg.MaxSizeMB<<20+1))
 	if err != nil {
 		writeErr(w, http.StatusBadRequest, "read file failed")
 		return
 	}
-	if int64(len(data)) >= s.cfg.MaxSizeMB<<20 {
+	if int64(len(data)) > s.cfg.MaxSizeMB<<20 {
 		writeErr(w, http.StatusRequestEntityTooLarge, "file too large")
 		return
 	}

@@ -50,3 +50,18 @@ func TestLoad(t *testing.T) {
 		t.Fatalf("MaxDimension = %d, want default 2560", c.MaxDimension)
 	}
 }
+
+func TestValidateRejectsEmptyToken(t *testing.T) {
+	c := Default()
+	c.Token = ""
+	if err := c.Validate(); err == nil {
+		t.Fatal("expected error for empty token, got nil")
+	}
+}
+
+func TestValidateAcceptsToken(t *testing.T) {
+	c := Default()
+	if err := c.Validate(); err != nil {
+		t.Fatalf("unexpected error for non-empty token: %v", err)
+	}
+}

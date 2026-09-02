@@ -2,6 +2,8 @@ package imaging
 
 import (
 	"bytes"
+	"fmt"
+	"image"
 
 	_ "image/gif"
 	_ "image/jpeg"
@@ -10,6 +12,9 @@ import (
 	"github.com/chai2010/webp"
 	dimg "github.com/disintegration/imaging"
 )
+
+// maxPixels 限制解码前的像素总数，防止解压炸弹（超大尺寸图片在解码时耗尽内存）。
+const maxPixels = 50_000_000
 
 // Format 通过魔数嗅探返回图片格式：jpeg|png|gif|webp|svg，无法识别返回空串。
 func Format(b []byte) string {
@@ -39,6 +44,15 @@ func min(a, b int) int {
 // Process 缩放超限图片并可选转 WebP，返回处理后的字节与新宽高。
 // format 为 jpeg|png|webp；gif/svg 不应调用本函数（原样存储）。
 func Process(data []byte, format string, maxDimension int, convertWebp bool) ([]byte, int, int, error) {
+	// 先只读头部拿到尺寸，超限即可在完整解码前拒绝，避免解压炸弹。
+	cfg, _, err := image.DecodeConfig(bytes.NewReader(data))
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	if cfg.Width > 0 && cfg.Height > 0 && cfg.Width*cfg.Height > maxPixels {
+		return nil, 0, 0, fmt.Errorf("image too large: %dx%d exceeds %d pixels", cfg.Width, cfg.Height, maxPixels)
+	}
+
 	src, err := dimg.Decode(bytes.NewReader(data))
 	if err != nil {
 		return nil, 0, 0, err
