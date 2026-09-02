@@ -44,6 +44,9 @@ func Process(data []byte, format string, maxDimension int, convertWebp bool) ([]
 		return nil, 0, 0, err
 	}
 	bounds := src.Bounds()
+	if !convertWebp && (maxDimension <= 0 || (bounds.Dx() <= maxDimension && bounds.Dy() <= maxDimension)) {
+		return data, bounds.Dx(), bounds.Dy(), nil
+	}
 	if maxDimension > 0 && (bounds.Dx() > maxDimension || bounds.Dy() > maxDimension) {
 		src = dimg.Fit(src, maxDimension, maxDimension, dimg.Lanczos)
 		bounds = src.Bounds()

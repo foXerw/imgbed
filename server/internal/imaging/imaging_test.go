@@ -1,10 +1,10 @@
 package imaging
 
 import (
+	"bytes"
 	"image"
 	"image/color"
 	"image/png"
-	"bytes"
 	"testing"
 )
 
@@ -57,6 +57,20 @@ func TestProcessNoUpscale(t *testing.T) {
 	}
 	if w != 100 || h != 100 {
 		t.Fatalf("dims = %dx%d, want 100x100 (no upscale)", w, h)
+	}
+}
+
+func TestProcessInLimitPassthrough(t *testing.T) {
+	data := pngBytes(t, 100, 100)
+	out, w, h, err := Process(data, "png", 2560, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(out, data) {
+		t.Fatal("in-limit PNG with convertWebp=false should return original bytes unchanged")
+	}
+	if w != 100 || h != 100 {
+		t.Fatalf("dims = %dx%d, want 100x100", w, h)
 	}
 }
 
