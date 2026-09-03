@@ -1,5 +1,6 @@
 // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 mod config;
+mod upload;
 
 #[tauri::command]
 fn greet(name: &str) -> String {
