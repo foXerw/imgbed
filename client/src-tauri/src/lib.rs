@@ -3,7 +3,6 @@ mod history;
 mod upload;
 
 use serde::{Deserialize, Serialize};
-use tauri::Manager;
 
 use config::ClientConfig;
 use history::HistoryEntry;
@@ -54,11 +53,18 @@ fn upload_file(app: tauri::AppHandle, path: String) -> Result<UploadResult, Stri
     Ok(r)
 }
 
+fn blocking_client() -> Result<reqwest::blocking::Client, String> {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 fn list_remote(app: tauri::AppHandle) -> Result<Vec<RemoteImage>, String> {
     let cfg = config::load(&app)?;
     let url = format!("{}/api/images", cfg.server.trim_end_matches('/'));
-    let resp = reqwest::blocking::Client::new()
+    let resp = blocking_client()?
         .get(&url)
         .header("X-Auth-Token", &cfg.token)
         .send()
@@ -82,7 +88,7 @@ fn delete_remote(app: tauri::AppHandle, id: String) -> Result<(), String> {
         cfg.server.trim_end_matches('/'),
         id
     );
-    let resp = reqwest::blocking::Client::new()
+    let resp = blocking_client()?
         .delete(&url)
         .header("X-Auth-Token", &cfg.token)
         .send()

@@ -46,26 +46,38 @@ export default function App() {
 
   useEffect(() => {
     (async () => {
-      const cfg = await invoke<{ server: string; token: string }>("get_config");
-      setServer(cfg.server);
-      setToken(cfg.token);
-      refreshHistory();
-      refreshRemote();
+      try {
+        const cfg = await invoke<{ server: string; token: string }>("get_config");
+        setServer(cfg.server);
+        setToken(cfg.token);
+        await refreshHistory();
+        await refreshRemote();
+      } catch (e) {
+        setStatus(String(e));
+      }
     })();
     register("Ctrl+Shift+U", uploadClipboard);
     return () => { unregister("Ctrl+Shift+U"); };
   }, []);
 
   useEffect(() => {
+    let disposed = false;
     let unlisten: (() => void) | undefined;
-    getCurrentWebview().onDragDropEvent((event) => {
+    getCurrentWebview().onDragDropEvent(async (event) => {
       if (event.payload.type === "drop") {
         for (const path of event.payload.paths) {
-          void uploadPath(path);
+          await uploadPath(path);
         }
       }
-    }).then((fn) => { unlisten = fn; });
-    return () => { unlisten?.(); };
+    }).then((fn) => {
+      if (!disposed) {
+        unlisten = fn;
+      }
+    });
+    return () => {
+      disposed = true;
+      unlisten?.();
+    };
   }, []);
 
   const uploadClipboard = async () => {
@@ -92,13 +104,21 @@ export default function App() {
   };
 
   const copy = async (text: string) => {
-    await writeText(text);
-    setStatus("已复制");
+    try {
+      await writeText(text);
+      setStatus("已复制");
+    } catch (e) {
+      setStatus(String(e));
+    }
   };
 
   const saveConfig = async () => {
-    await invoke("set_config", { server, token });
-    setStatus("配置已保存");
+    try {
+      await invoke("set_config", { server, token });
+      setStatus("配置已保存");
+    } catch (e) {
+      setStatus(String(e));
+    }
   };
 
   return (
@@ -139,7 +159,12 @@ export default function App() {
             <button onClick={() => copy(img.url)}>URL</button>
             <button
               onClick={async () => {
-                await invoke("delete_remote", { id: img.id });
+                if (!confirm(`确认删除 ${img.id}? 此操作不可撤销。`)) return;
+                try {
+                  await invoke("delete_remote", { id: img.id });
+                } catch (e) {
+                  setStatus(String(e));
+                }
                 refreshRemote();
               }}
             >

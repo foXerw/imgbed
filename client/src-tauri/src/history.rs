@@ -35,7 +35,10 @@ mod tests {
 
 use std::fs;
 use std::path::PathBuf;
+use std::sync::{LazyLock, Mutex};
 use tauri::{AppHandle, Manager};
+
+static HISTORY_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
 fn history_path(app: &AppHandle) -> Result<PathBuf, String> {
     let dir = app.path().app_data_dir().map_err(|e| e.to_string())?;
@@ -53,6 +56,7 @@ pub fn load(app: &AppHandle) -> Vec<HistoryEntry> {
 }
 
 pub fn append(app: &AppHandle, url: &str) -> Result<(), String> {
+    let _guard = HISTORY_LOCK.lock().map_err(|e| e.to_string())?;
     let mut entries = load(app);
     entries.insert(
         0,

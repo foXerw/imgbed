@@ -1,3 +1,4 @@
+use reqwest::blocking::multipart;
 use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -23,8 +24,6 @@ mod tests {
         assert_eq!(r.url, "https://img.example.com/2026/09/03/abc.png");
     }
 }
-
-use reqwest::blocking::multipart;
 
 pub fn upload(data: &[u8], filename: &str, server: &str, token: &str) -> Result<UploadResult, String> {
     let url = format!("{}/api/upload", server.trim_end_matches('/'));
