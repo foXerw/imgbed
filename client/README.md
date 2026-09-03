@@ -1,7 +1,30 @@
-# Tauri + React + Typescript
+# Image Hosting Client
 
-This template should help get you started developing with Tauri, React and Typescript in Vite.
+Tauri v2 desktop client (Rust backend + React/TypeScript frontend) for the image hosting service.
 
-## Recommended IDE Setup
+## Features
 
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+- Configure server address and token (persisted locally).
+- Clipboard screenshot upload via `Ctrl+Shift+U` (URL copied back to clipboard).
+- Native drag-and-drop image upload.
+- Upload history with copy URL / Markdown.
+- Remote image browse and delete.
+
+## Development
+
+```bash
+npm install
+npm run tauri dev
+```
+
+## Build
+
+```bash
+npm run tauri build
+```
+
+## Test
+
+```bash
+cd src-tauri && cargo test
+```
