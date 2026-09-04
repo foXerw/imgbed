@@ -1,5 +1,12 @@
-use tauri::AppHandle;
+use std::sync::Mutex;
+
+use tauri::{
+    menu::{Menu, MenuItem},
+    tray::TrayIconBuilder,
+    AppHandle, Manager, WindowEvent,
+};
 use tauri_plugin_clipboard_manager::ClipboardExt;
+use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::config;
@@ -45,6 +52,85 @@ fn run_upload(app: &AppHandle) -> Result<UploadResult, String> {
     Ok(r)
 }
 
+pub struct HotkeyState(pub Mutex<Option<Shortcut>>);
+
+fn install_shortcut(app: &AppHandle, shortcut: &Shortcut) -> Result<(), String> {
+    app.global_shortcut()
+        .on_shortcut(shortcut.clone(), |app, _sc, event| {
+            if event.state == ShortcutState::Pressed {
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    let _ = upload_clipboard_impl(&app);
+                });
+            }
+        })
+        .map_err(|e| e.to_string())
+}
+
+pub fn update_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
+    let shortcut: Shortcut = hotkey
+        .parse()
+        .map_err(|e| format!("invalid hotkey {hotkey}: {e}"))?;
+    let state = app.state::<HotkeyState>();
+    let mut guard = state.0.lock().map_err(|e| e.to_string())?;
+    if let Some(old) = guard.take() {
+        let _ = app.global_shortcut().unregister(old);
+    }
+    install_shortcut(app, &shortcut)?;
+    *guard = Some(shortcut);
+    Ok(())
+}
+
+pub fn init(app: &AppHandle) -> Result<(), String> {
+    // 关窗常驻：拦截 CloseRequested 隐藏到托盘
+    if let Some(window) = app.get_webview_window("main") {
+        let w = window.clone();
+        window.on_window_event(move |event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = w.hide();
+            }
+        });
+    }
+
+    let show = MenuItem::with_id(app, "show", "打开主窗口", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let upload = MenuItem::with_id(app, "upload", "上传剪贴板", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)
+        .map_err(|e| e.to_string())?;
+    let menu = Menu::with_items(app, &[&show, &upload, &quit]).map_err(|e| e.to_string())?;
+
+    TrayIconBuilder::with_id("main-tray")
+        .icon(app.default_window_icon().unwrap().clone())
+        .menu(&menu)
+        .show_menu_on_left_click(true)
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "show" => {
+                if let Some(w) = app.get_webview_window("main") {
+                    let _ = w.show();
+                    let _ = w.set_focus();
+                }
+            }
+            "upload" => {
+                let app = app.clone();
+                std::thread::spawn(move || {
+                    let _ = upload_clipboard_impl(&app);
+                });
+            }
+            "quit" => app.exit(0),
+            _ => {}
+        })
+        .build(app)
+        .map_err(|e| e.to_string())?;
+
+    let hotkey = config::load(app)
+        .map(|c| c.hotkey)
+        .unwrap_or_else(|_| "Alt+Shift+V".into());
+    update_hotkey(app, &hotkey)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -63,5 +149,16 @@ mod tests {
     fn encode_png_rejects_bad_buffer() {
         // 3x3 需 36 字节，仅给 4 字节 → from_raw 返回 None
         assert!(encode_png(&[0u8; 4], 3, 3).is_err());
+    }
+
+    #[test]
+    fn parse_valid_hotkey() {
+        assert!("Alt+Shift+V".parse::<super::Shortcut>().is_ok());
+        assert!("Ctrl+Alt+U".parse::<super::Shortcut>().is_ok());
+    }
+
+    #[test]
+    fn parse_invalid_hotkey() {
+        assert!("NotAKey".parse::<super::Shortcut>().is_err());
     }
 }

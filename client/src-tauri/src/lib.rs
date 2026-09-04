@@ -24,8 +24,18 @@ fn get_config(app: tauri::AppHandle) -> ClientConfig {
 }
 
 #[tauri::command]
-fn set_config(app: tauri::AppHandle, server: String, token: String) -> Result<(), String> {
-    config::save(&app, &ClientConfig { server, token, ..Default::default() })
+fn set_config(
+    app: tauri::AppHandle,
+    server: String,
+    token: String,
+    hotkey: String,
+) -> Result<(), String> {
+    let new_cfg = ClientConfig { server, token, hotkey };
+    let old_cfg = config::load(&app)?;
+    if new_cfg.hotkey != old_cfg.hotkey {
+        tray::update_hotkey(&app, &new_cfg.hotkey)?;
+    }
+    config::save(&app, &new_cfg)
 }
 
 #[tauri::command]
@@ -117,6 +127,7 @@ pub fn run() {
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_notification::init())
+        .manage(tray::HotkeyState(std::sync::Mutex::new(None)))
         .invoke_handler(tauri::generate_handler![
             get_config,
             set_config,
@@ -127,6 +138,11 @@ pub fn run() {
             delete_remote,
             get_history
         ])
+        .setup(|app| {
+            let handle = app.handle().clone();
+            tray::init(&handle).map_err(std::io::Error::other)?;
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
