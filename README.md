@@ -1,13 +1,13 @@
 # imgbed
 
-个人图床服务：把博客图片托管在自己的服务器上。Go 服务端 + Windows 桌面客户端（计划中）。
+个人图床服务：把博客图片托管在自己的服务器上。Go 服务端 + Windows 桌面客户端。
 
 ## 结构
 
 ```
 server/   Go 服务端：上传、静态托管、图片处理、Token 鉴权、内嵌管理界面
 docs/     设计文档与实现计划（specs / plans）
-client/   Windows 桌面客户端（Tauri v2，计划中）
+client/   Windows 桌面客户端（Tauri v2）
 ```
 
 ## 服务端快速开始

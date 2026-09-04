@@ -4,10 +4,11 @@ Tauri v2 desktop client (Rust backend + React/TypeScript frontend) for the image
 
 ## Features
 
-- Configure server address and token (persisted locally).
-- Clipboard screenshot upload via `Ctrl+Shift+U` (URL copied back to clipboard).
+- Configure server address, token, and global hotkey (persisted locally).
+- Clipboard one-click upload via a global hotkey (default `Alt+Shift+V`) or the tray menu — URL copied back to clipboard and a desktop notification shown.
+- System tray with open / upload / quit; closing the window minimizes to tray.
 - Native drag-and-drop image upload.
-- Upload history with copy URL / Markdown.
+- Upload history (SQLite-backed) with copy URL / Markdown.
 - Remote image browse and delete.
 
 ## Development
@@ -26,5 +27,6 @@ npm run tauri build
 ## Test
 
 ```bash
-cd src-tauri && cargo test
+cd src-tauri && cargo test   # Rust unit tests
+npm test                     # Vitest frontend tests
 ```
