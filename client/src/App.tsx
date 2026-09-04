@@ -20,7 +20,11 @@ export default function App() {
   const [status, setStatus] = useState("");
 
   const refreshHistory = useCallback(async () => {
-    setHistory(await invoke<HistoryEntry[]>("get_history"));
+    try {
+      setHistory(await invoke<HistoryEntry[]>("get_history"));
+    } catch (e) {
+      setStatus(String(e));
+    }
   }, []);
 
   const refreshRemote = useCallback(async () => {

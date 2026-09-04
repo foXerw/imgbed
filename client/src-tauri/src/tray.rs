@@ -14,7 +14,7 @@ use crate::config;
 use crate::history;
 use crate::upload::{self, UploadResult};
 
-fn encode_png(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
+pub(crate) fn encode_png(rgba: &[u8], width: u32, height: u32) -> Result<Vec<u8>, String> {
     let img = image::RgbaImage::from_raw(width, height, rgba.to_vec())
         .ok_or_else(|| "invalid image buffer".to_string())?;
     let mut buf = Vec::new();
@@ -83,11 +83,12 @@ pub fn update_hotkey(app: &AppHandle, hotkey: &str) -> Result<(), String> {
         .map_err(|e| format!("invalid hotkey {hotkey}: {e}"))?;
     let state = app.state::<HotkeyState>();
     let mut guard = state.0.lock().map_err(|e| e.to_string())?;
-    if let Some(old) = guard.take() {
+    // Register the new shortcut before dropping the old one, so a failed
+    // registration leaves the old hotkey (and its tracked state) intact.
+    install_shortcut(app, &shortcut)?;
+    if let Some(old) = guard.replace(shortcut) {
         let _ = app.global_shortcut().unregister(old);
     }
-    install_shortcut(app, &shortcut)?;
-    *guard = Some(shortcut);
     Ok(())
 }
 
@@ -129,9 +130,13 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
         .build(app)
         .map_err(|e| e.to_string())?;
 
-    let hotkey = config::load(app)
-        .map(|c| c.hotkey)
-        .unwrap_or_else(|_| "Alt+Shift+V".into());
+    let hotkey = match config::load(app) {
+        Ok(cfg) => cfg.hotkey,
+        Err(e) => {
+            eprintln!("config load failed, falling back to default hotkey: {e}");
+            "Alt+Shift+V".into()
+        }
+    };
     update_hotkey(app, &hotkey)?;
     Ok(())
 }
