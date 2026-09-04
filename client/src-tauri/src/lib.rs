@@ -31,7 +31,7 @@ fn set_config(
     hotkey: String,
 ) -> Result<(), String> {
     let new_cfg = ClientConfig { server, token, hotkey };
-    let old_cfg = config::load(&app)?;
+    let old_cfg = config::load(&app).unwrap_or_default();
     if new_cfg.hotkey != old_cfg.hotkey {
         tray::update_hotkey(&app, &new_cfg.hotkey)?;
     }
