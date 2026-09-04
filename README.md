@@ -20,7 +20,11 @@ go run ./cmd/imgserver -config config.yaml
 
 详细接口与交叉编译见 [`server/README.md`](server/README.md)。
 
-## 功能
+## 客户端
+
+Windows 桌面客户端（Tauri v2）：剪贴板一键上传（托盘 + 全局热键 + 桌面通知）、拖拽上传、上传历史（SQLite）、远程图片浏览/删除。详见 [`client/README.md`](client/README.md)。
+
+## 服务端功能
 
 - 上传（`POST /api/upload`，multipart，需 `X-Auth-Token`）
 - 列表 / 删除（`GET /api/images`、`DELETE /api/images/{id}`，需 token）
@@ -28,7 +32,7 @@ go run ./cmd/imgserver -config config.yaml
 - 图片处理：超限自动缩放、可选 WebP 转换、格式白名单
 - 内嵌 Web 管理界面（`GET /admin`，需 token）
 
-## 安全
+## 服务端安全
 
 - 上传/列表/删除/管理界面均要求 `X-Auth-Token` 头匹配配置 token。
 - 启动时校验：`token` 为空会拒绝启动；使用占位 token `change-me` 会告警。
