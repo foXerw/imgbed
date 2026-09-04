@@ -1,3 +1,4 @@
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use tauri::{
@@ -52,16 +53,25 @@ fn run_upload(app: &AppHandle) -> Result<UploadResult, String> {
     Ok(r)
 }
 
+static UPLOADING: AtomicBool = AtomicBool::new(false);
+
+fn spawn_upload(app: AppHandle) {
+    if UPLOADING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let _ = upload_clipboard_impl(&app);
+        UPLOADING.store(false, Ordering::SeqCst);
+    });
+}
+
 pub struct HotkeyState(pub Mutex<Option<Shortcut>>);
 
 fn install_shortcut(app: &AppHandle, shortcut: &Shortcut) -> Result<(), String> {
     app.global_shortcut()
         .on_shortcut(shortcut.clone(), |app, _sc, event| {
             if event.state == ShortcutState::Pressed {
-                let app = app.clone();
-                std::thread::spawn(move || {
-                    let _ = upload_clipboard_impl(&app);
-                });
+                spawn_upload(app.clone());
             }
         })
         .map_err(|e| e.to_string())
@@ -112,12 +122,7 @@ pub fn init(app: &AppHandle) -> Result<(), String> {
                     let _ = w.set_focus();
                 }
             }
-            "upload" => {
-                let app = app.clone();
-                std::thread::spawn(move || {
-                    let _ = upload_clipboard_impl(&app);
-                });
-            }
+            "upload" => spawn_upload(app.clone()),
             "quit" => app.exit(0),
             _ => {}
         })

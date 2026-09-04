@@ -116,8 +116,10 @@ fn get_history(app: tauri::AppHandle) -> Vec<HistoryEntry> {
 }
 
 #[tauri::command]
-fn upload_clipboard(app: tauri::AppHandle) -> Result<UploadResult, String> {
-    tray::upload_clipboard_impl(&app)
+async fn upload_clipboard(app: tauri::AppHandle) -> Result<UploadResult, String> {
+    tauri::async_runtime::spawn_blocking(move || tray::upload_clipboard_impl(&app))
+        .await
+        .map_err(|e| e.to_string())?
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
