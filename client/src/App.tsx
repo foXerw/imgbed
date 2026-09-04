@@ -1,9 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import type { Image } from "@tauri-apps/api/image";
-import { writeText, readImage } from "@tauri-apps/plugin-clipboard-manager";
-import { register, unregister } from "@tauri-apps/plugin-global-shortcut";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 
 type UploadResult = {
   id: string; url: string; filename: string; size: number;
@@ -11,23 +9,12 @@ type UploadResult = {
 };
 type RemoteImage = { id: string; url: string; size: number; uploadedAt: string };
 type HistoryEntry = { url: string; markdown: string; uploaded_at: string };
-
-async function imageToBase64(img: Image): Promise<string> {
-  const rgba = await img.rgba();
-  const size = await img.size();
-  const canvas = document.createElement("canvas");
-  canvas.width = size.width;
-  canvas.height = size.height;
-  const ctx = canvas.getContext("2d")!;
-  const data = new Uint8ClampedArray(rgba);
-  ctx.putImageData(new ImageData(data, size.width, size.height), 0, 0);
-  const dataUrl = canvas.toDataURL("image/png");
-  return dataUrl.replace(/^data:image\/png;base64,/, "");
-}
+type Config = { server: string; token: string; hotkey: string };
 
 export default function App() {
   const [server, setServer] = useState("");
   const [token, setToken] = useState("");
+  const [hotkey, setHotkey] = useState("");
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [remote, setRemote] = useState<RemoteImage[]>([]);
   const [status, setStatus] = useState("");
@@ -47,17 +34,16 @@ export default function App() {
   useEffect(() => {
     (async () => {
       try {
-        const cfg = await invoke<{ server: string; token: string }>("get_config");
+        const cfg = await invoke<Config>("get_config");
         setServer(cfg.server);
         setToken(cfg.token);
+        setHotkey(cfg.hotkey);
         await refreshHistory();
         await refreshRemote();
       } catch (e) {
         setStatus(String(e));
       }
     })();
-    register("Ctrl+Shift+U", uploadClipboard);
-    return () => { unregister("Ctrl+Shift+U"); };
   }, []);
 
   useEffect(() => {
@@ -82,10 +68,7 @@ export default function App() {
 
   const uploadClipboard = async () => {
     try {
-      const img = await readImage();
-      const b64 = await imageToBase64(img);
-      const r = await invoke<UploadResult>("upload_bytes", { base64: b64, filename: "clipboard.png" });
-      await writeText(r.url);
+      const r = await invoke<UploadResult>("upload_clipboard");
       setStatus(`已上传并复制: ${r.url}`);
       refreshHistory();
     } catch (e) {
@@ -114,7 +97,7 @@ export default function App() {
 
   const saveConfig = async () => {
     try {
-      await invoke("set_config", { server, token });
+      await invoke("set_config", { server, token, hotkey });
       setStatus("配置已保存");
     } catch (e) {
       setStatus(String(e));
@@ -127,8 +110,9 @@ export default function App() {
       <section style={{ marginBottom: 16 }}>
         <input value={server} onChange={(e) => setServer(e.target.value)} placeholder="服务地址" />
         <input value={token} onChange={(e) => setToken(e.target.value)} placeholder="Token" />
+        <input value={hotkey} onChange={(e) => setHotkey(e.target.value)} placeholder="全局热键" />
         <button onClick={saveConfig}>保存配置</button>
-        <button onClick={uploadClipboard}>上传剪贴板 (Ctrl+Shift+U)</button>
+        <button onClick={uploadClipboard}>上传剪贴板</button>
       </section>
 
       <section
