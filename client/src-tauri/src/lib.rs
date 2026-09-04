@@ -24,7 +24,7 @@ fn get_config(app: tauri::AppHandle) -> ClientConfig {
 
 #[tauri::command]
 fn set_config(app: tauri::AppHandle, server: String, token: String) -> Result<(), String> {
-    config::save(&app, &ClientConfig { server, token })
+    config::save(&app, &ClientConfig { server, token, ..Default::default() })
 }
 
 #[tauri::command]

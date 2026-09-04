@@ -1,9 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+fn default_hotkey() -> String {
+    "Alt+Shift+V".into()
+}
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub struct ClientConfig {
     pub server: String,
     pub token: String,
+    #[serde(default = "default_hotkey")]
+    pub hotkey: String,
 }
 
 impl Default for ClientConfig {
@@ -11,6 +17,7 @@ impl Default for ClientConfig {
         Self {
             server: "http://localhost:8080".into(),
             token: "change-me".into(),
+            hotkey: default_hotkey(),
         }
     }
 }
@@ -24,6 +31,7 @@ mod tests {
         let c = ClientConfig::default();
         assert_eq!(c.server, "http://localhost:8080");
         assert_eq!(c.token, "change-me");
+        assert_eq!(c.hotkey, "Alt+Shift+V");
     }
 
     #[test]
@@ -31,10 +39,18 @@ mod tests {
         let c = ClientConfig {
             server: "https://img.example.com".into(),
             token: "abc".into(),
+            hotkey: "Ctrl+Alt+U".into(),
         };
         let s = serde_json::to_string(&c).unwrap();
         let d: ClientConfig = serde_json::from_str(&s).unwrap();
         assert_eq!(c, d);
+    }
+
+    #[test]
+    fn legacy_config_without_hotkey_defaults() {
+        let old = r#"{"server":"https://x.example.com","token":"t"}"#;
+        let c: ClientConfig = serde_json::from_str(old).unwrap();
+        assert_eq!(c.hotkey, "Alt+Shift+V");
     }
 }
 
