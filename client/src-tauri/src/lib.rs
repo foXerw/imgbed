@@ -1,5 +1,6 @@
 mod config;
 mod history;
+mod tray;
 mod upload;
 
 use serde::{Deserialize, Serialize};
@@ -104,17 +105,24 @@ fn get_history(app: tauri::AppHandle) -> Vec<HistoryEntry> {
     history::load(&app)
 }
 
+#[tauri::command]
+fn upload_clipboard(app: tauri::AppHandle) -> Result<UploadResult, String> {
+    tray::upload_clipboard_impl(&app)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             get_config,
             set_config,
             upload_bytes,
             upload_file,
+            upload_clipboard,
             list_remote,
             delete_remote,
             get_history
